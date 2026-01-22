@@ -24,6 +24,7 @@ export const subscriptions = pgTable('subscriptions', {
     vendorName: text('vendor_name'),
     vendorContact: text('vendor_contact'),
     fee: decimal('fee', { precision: 10, scale: 2 }).notNull(),
+    renewalFee: decimal('renewal_fee', { precision: 10, scale: 2 }), // 續約時的原價
     currency: text('currency').default('TWD'),
     billingCycle: text('billing_cycle').notNull(), // monthly | quarterly | yearly
     startDate: date('start_date').notNull(),

@@ -22,6 +22,7 @@ interface ApprovalRequest {
         fee: string;
         currency: string;
         billingCycle: string;
+        budgetCategory?: string;
     };
     requester?: {
         displayName: string | null;
@@ -29,11 +30,15 @@ interface ApprovalRequest {
     };
 }
 
+import { SubscriptionDetailModal } from '@/components/subscriptions/SubscriptionDetailModal';
+
 export default function ApprovalsPage() {
     const { userId } = useAuth();
     const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
+    const [filterBudget, setFilterBudget] = useState<string>('all');
 
     useEffect(() => {
         loadApprovals();
@@ -87,8 +92,28 @@ export default function ApprovalsPage() {
         rejected: '已駁回',
     };
 
-    const pendingApprovals = approvals.filter((a) => a.status === 'pending');
-    const completedApprovals = approvals.filter((a) => a.status !== 'pending');
+    // Filter logic
+    const filteredApprovals = approvals.filter(a => {
+        if (filterBudget !== 'all') {
+            return a.subscription?.budgetCategory === filterBudget;
+        }
+        return true;
+    });
+
+    const pendingApprovals = filteredApprovals.filter((a) => a.status === 'pending');
+    const completedApprovals = filteredApprovals.filter((a) => a.status !== 'pending');
+
+    // Budget Categories consistent with New Subscription Page
+    const budgetCategoryOptions = [
+        { value: 'software', label: '軟體服務' },
+        { value: 'cloud', label: '雲端服務' },
+        { value: 'productivity', label: '生產力工具' },
+        { value: 'marketing', label: '行銷工具' },
+        { value: 'design', label: '設計工具' },
+        { value: 'communication', label: '通訊工具' },
+        { value: 'entertainment', label: '娛樂' },
+        { value: 'other', label: '其他' },
+    ];
 
     return (
         <>
@@ -97,7 +122,7 @@ export default function ApprovalsPage() {
             <div className="p-4 lg:p-8 space-y-6">
                 {/* Pending */}
                 <Card>
-                    <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                    <div className="p-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <CardTitle className="flex items-center gap-2">
                             <Clock size={18} className="text-amber-400" />
                             待處理審批
@@ -107,18 +132,32 @@ export default function ApprovalsPage() {
                                 </span>
                             )}
                         </CardTitle>
+
+                        {/* Budget Filter */}
+                        <div className="w-full sm:w-48">
+                            <select
+                                value={filterBudget}
+                                onChange={(e) => setFilterBudget(e.target.value)}
+                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            >
+                                <option value="all">所有預算類別</option>
+                                {budgetCategoryOptions.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     <CardContent className="divide-y divide-white/10">
                         {loading ? (
                             <p className="text-slate-400 text-sm py-4">載入中...</p>
                         ) : pendingApprovals.length === 0 ? (
-                            <p className="text-slate-400 text-sm py-4">沒有待處理的審批 🎉</p>
+                            <p className="text-slate-400 text-sm py-4">沒有符合條件的待處理審批 🎉</p>
                         ) : (
                             pendingApprovals.map((approval) => (
                                 <div key={approval.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div className="flex items-start gap-4">
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${approval.type === 'create' ? 'bg-emerald-500/20' :
-                                                approval.type === 'cancel' ? 'bg-rose-500/20' : 'bg-amber-500/20'
+                                            approval.type === 'cancel' ? 'bg-rose-500/20' : 'bg-amber-500/20'
                                             }`}>
                                             {typeIcons[approval.type]}
                                         </div>
@@ -127,20 +166,27 @@ export default function ApprovalsPage() {
                                                 <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
                                                     {typeLabels[approval.type]}
                                                 </span>
-                                                <Link
-                                                    href={`/subscriptions/${approval.subscriptionId}`}
-                                                    className="font-medium text-white hover:text-indigo-400 transition-colors"
+                                                <button
+                                                    onClick={() => setSelectedApproval(approval)}
+                                                    className="font-medium text-white hover:text-indigo-400 transition-colors text-left"
                                                 >
                                                     {approval.subscription?.name || '訂閱'}
-                                                </Link>
+                                                </button>
                                             </div>
                                             <p className="text-sm text-slate-400">
                                                 {approval.subscription?.currency} {Number(approval.subscription?.fee || 0).toLocaleString('zh-TW')}
                                                 / {approval.subscription?.billingCycle === 'monthly' ? '月' : approval.subscription?.billingCycle === 'quarterly' ? '季' : '年'}
                                             </p>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                由 {approval.requester?.displayName || approval.requester?.email || '用戶'} 於 {new Date(approval.createdAt).toLocaleDateString('zh-TW')} 提出
-                                            </p>
+                                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                <span className="text-xs text-slate-500">
+                                                    由 <span className="text-slate-300">{approval.requester?.displayName || approval.requester?.email || '用戶'}</span> 於 {new Date(approval.createdAt).toLocaleDateString('zh-TW')} 提出
+                                                </span>
+                                                {approval.subscription?.budgetCategory && (
+                                                    <span className="text-xs px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10 capitalize">
+                                                        {approval.subscription.budgetCategory}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex gap-2 sm:flex-shrink-0">
@@ -183,12 +229,17 @@ export default function ApprovalsPage() {
                                 <div key={approval.id} className="py-4 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${approval.type === 'create' ? 'bg-emerald-500/20' :
-                                                approval.type === 'cancel' ? 'bg-rose-500/20' : 'bg-amber-500/20'
+                                            approval.type === 'cancel' ? 'bg-rose-500/20' : 'bg-amber-500/20'
                                             }`}>
                                             {typeIcons[approval.type]}
                                         </div>
                                         <div>
-                                            <p className="font-medium text-white">{approval.subscription?.name || '訂閱'}</p>
+                                            <button
+                                                onClick={() => setSelectedApproval(approval)}
+                                                className="font-medium text-white hover:text-indigo-400 transition-colors text-left"
+                                            >
+                                                {approval.subscription?.name || '訂閱'}
+                                            </button>
                                             <p className="text-xs text-slate-500">
                                                 {new Date(approval.resolvedAt || approval.createdAt).toLocaleDateString('zh-TW')}
                                             </p>
@@ -203,6 +254,12 @@ export default function ApprovalsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <SubscriptionDetailModal
+                isOpen={!!selectedApproval}
+                onClose={() => setSelectedApproval(null)}
+                approval={selectedApproval}
+            />
         </>
     );
 }

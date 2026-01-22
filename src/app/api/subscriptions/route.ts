@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { db, subscriptions, approvalRequests } from '@/lib/db';
+import { db, subscriptions, approvalRequests, profiles } from '@/lib/db';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
     const { userId } = await auth();
@@ -8,6 +9,23 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Role-based access control
+    const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, userId),
+    });
+
+    const role = profile?.role || 'member';
+
+    // If member, only return own subscriptions
+    if (role === 'member') {
+        const userSubscriptions = await db.query.subscriptions.findMany({
+            where: eq(subscriptions.ownerId, userId),
+            orderBy: (subscriptions, { desc }) => [desc(subscriptions.createdAt)],
+        });
+        return NextResponse.json(userSubscriptions);
+    }
+
+    // If manager or admin, return all subscriptions
     const allSubscriptions = await db.query.subscriptions.findMany({
         orderBy: (subscriptions, { desc }) => [desc(subscriptions.createdAt)],
     });
@@ -30,6 +48,7 @@ export async function POST(request: Request) {
             vendorName: body.vendor_name || null,
             vendorContact: body.vendor_contact || null,
             fee: body.fee.toString(),
+            renewalFee: body.renewal_fee ? body.renewal_fee.toString() : null,
             currency: body.currency || 'TWD',
             billingCycle: body.billing_cycle,
             startDate: body.start_date,

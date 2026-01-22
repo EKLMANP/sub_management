@@ -8,6 +8,13 @@
       "when": 1769006690281,
       "tag": "0000_bent_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769045746756,
+      "tag": "0001_silent_ulik",
+      "breakpoints": true
     }
   ]
 }

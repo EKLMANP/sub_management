@@ -1,0 +1,1 @@
+ALTER TABLE "subscriptions" ADD COLUMN "renewal_fee" numeric(10, 2);

@@ -33,12 +33,29 @@ interface Department {
     name: string;
 }
 
-const COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'];
+// More distinct colors for pie chart
+const COLORS = ['#22c55e', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#06b6d4', '#f43f5e'];
+
+// Currency conversion rate
+const USD_TO_TWD = 31;
+
+// Budget category labels (consistent with new subscription page)
+const categoryLabels: Record<string, string> = {
+    software: '軟體服務',
+    cloud: '雲端服務',
+    productivity: '生產力工具',
+    marketing: '行銷工具',
+    design: '設計工具',
+    communication: '通訊工具',
+    entertainment: '娛樂',
+    other: '其他',
+};
 
 export default function ReportsPage() {
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
+    const [trendView, setTrendView] = useState<'monthly' | 'yearly'>('monthly');
 
     useEffect(() => {
         loadData();
@@ -61,7 +78,11 @@ export default function ReportsPage() {
     }
 
     const getMonthlyFee = (sub: Subscription) => {
-        const fee = Number(sub.fee);
+        let fee = Number(sub.fee);
+        // Convert USD to TWD
+        if (sub.currency === 'USD') {
+            fee = fee * USD_TO_TWD;
+        }
         if (sub.billingCycle === 'monthly') return fee;
         if (sub.billingCycle === 'quarterly') return fee / 3;
         if (sub.billingCycle === 'yearly') return fee / 12;
@@ -69,13 +90,14 @@ export default function ReportsPage() {
     };
 
     const categoryData = subscriptions.reduce((acc, sub) => {
-        const category = sub.budgetCategory || '未分類';
-        const existing = acc.find((c) => c.name === category);
+        const rawCategory = sub.budgetCategory || 'other';
+        const categoryLabel = categoryLabels[rawCategory] || '未分類';
+        const existing = acc.find((c) => c.name === categoryLabel);
         const monthlyFee = getMonthlyFee(sub);
         if (existing) {
             existing.value += monthlyFee;
         } else {
-            acc.push({ name: category, value: monthlyFee });
+            acc.push({ name: categoryLabel, value: monthlyFee });
         }
         return acc;
     }, [] as { name: string; value: number }[]);
@@ -92,15 +114,28 @@ export default function ReportsPage() {
         return acc;
     }, [] as { name: string; amount: number }[]);
 
-    const months = ['1月', '2月', '3月', '4月', '5月', '6月'];
+    const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    const years = ['2022', '2023', '2024', '2025', '2026'];
     const totalMonthly = subscriptions.reduce((sum, sub) => sum + getMonthlyFee(sub), 0);
-    const trendData = months.map((month) => ({
-        month,
+
+    const monthlyTrendData = months.map((month) => ({
+        label: month,
         amount: Math.round(totalMonthly * (0.9 + Math.random() * 0.2)),
     }));
 
+    const yearlyTrendData = years.map((year) => ({
+        label: year,
+        amount: Math.round(totalMonthly * 12 * (0.85 + Math.random() * 0.3)),
+    }));
+
+    const trendData = trendView === 'monthly' ? monthlyTrendData : yearlyTrendData;
+
     const totalYearly = subscriptions.reduce((sum, sub) => {
-        const fee = Number(sub.fee);
+        let fee = Number(sub.fee);
+        // Convert USD to TWD
+        if (sub.currency === 'USD') {
+            fee = fee * USD_TO_TWD;
+        }
         if (sub.billingCycle === 'monthly') return sum + fee * 12;
         if (sub.billingCycle === 'quarterly') return sum + fee * 4;
         return sum + fee;
@@ -180,8 +215,28 @@ export default function ReportsPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card>
-                        <div className="p-6 border-b border-white/10">
-                            <CardTitle>月支出趨勢</CardTitle>
+                        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                            <CardTitle>支出趨勢</CardTitle>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setTrendView('monthly')}
+                                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${trendView === 'monthly'
+                                        ? 'bg-indigo-500 text-white'
+                                        : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                        }`}
+                                >
+                                    月
+                                </button>
+                                <button
+                                    onClick={() => setTrendView('yearly')}
+                                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${trendView === 'yearly'
+                                        ? 'bg-indigo-500 text-white'
+                                        : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                        }`}
+                                >
+                                    年
+                                </button>
+                            </div>
                         </div>
                         <CardContent className="h-80">
                             {loading ? (
@@ -190,7 +245,7 @@ export default function ReportsPage() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={trendData}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                        <XAxis dataKey="month" stroke="#94a3b8" />
+                                        <XAxis dataKey="label" stroke="#94a3b8" />
                                         <YAxis stroke="#94a3b8" />
                                         <Tooltip
                                             contentStyle={{
@@ -238,12 +293,15 @@ export default function ReportsPage() {
                                             ))}
                                         </Pie>
                                         <Tooltip
-                                            formatter={(value: number) => `NT$ ${Math.round(value).toLocaleString()}`}
+                                            formatter={(value: number, name: string) => [`NT$ ${Math.round(value).toLocaleString()}`, name]}
+                                            labelFormatter={(name) => `${name}`}
                                             contentStyle={{
                                                 backgroundColor: '#1e293b',
                                                 border: '1px solid rgba(255,255,255,0.1)',
                                                 borderRadius: '12px',
+                                                padding: '8px 12px',
                                             }}
+                                            itemStyle={{ color: '#fff' }}
                                         />
                                         <Legend />
                                     </PieChart>

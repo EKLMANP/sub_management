@@ -14,6 +14,7 @@ import {
     Clock,
     ExternalLink,
 } from 'lucide-react';
+import { DocumentUpload } from '@/components/subscriptions/DocumentUpload';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -96,10 +97,12 @@ export default async function SubscriptionDetailPage({ params }: PageProps) {
                                     <p className="text-slate-400">{subscription.vendorName || '無供應商資訊'}</p>
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button variant="secondary" size="sm">
-                                        <Edit2 size={16} />
-                                        編輯
-                                    </Button>
+                                    <Link href={`/subscriptions/${id}/edit`}>
+                                        <Button variant="secondary" size="sm">
+                                            <Edit2 size={16} />
+                                            編輯
+                                        </Button>
+                                    </Link>
                                     <Button variant="danger" size="sm">
                                         <Trash2 size={16} />
                                         取消訂閱
@@ -233,9 +236,8 @@ export default async function SubscriptionDetailPage({ params }: PageProps) {
                                 <FileText size={18} className="text-indigo-400" />
                                 合約文件
                             </CardTitle>
-                            <Button variant="secondary" size="sm">
-                                上傳文件
-                            </Button>
+
+                            <DocumentUpload subscriptionId={id} />
                         </div>
                         <CardContent>
                             {documents.length === 0 ? (
@@ -291,8 +293,8 @@ export default async function SubscriptionDetailPage({ params }: PageProps) {
                             )}
                         </CardContent>
                     </Card>
-                </div>
-            </div>
+                </div >
+            </div >
         </>
     );
 }
